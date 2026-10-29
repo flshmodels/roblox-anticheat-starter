@@ -1,34 +1,77 @@
-# Roblox Anti-Cheat Starter Kit
+# Roblox Anti-Cheat Starter
 
-A small set of server-side building blocks for Roblox games. It helps developers limit remote spam, validate basic input, and detect use of a decoy remote. It is free to use under the MIT License.
+Server-side checks for Roblox games, with a JavaScript tool for reviewing detection logs.
 
-This is a starter kit, not a plug-and-play shield. **It cannot detect every cheat or reliably determine whether a player injected software.** It does not currently detect speed, flying, teleporting, impossible rewards, or aimbots. Those checks depend on your game and need their own server-side rules.
+[Studio setup & API](docs/REFERENCE.md) · [MIT license](LICENSE)
 
-## What it does
+## What's included
 
-- **RateLimiter** limits requests per player and action. It drops excess requests; a rate limit alone is not proof of cheating.
-- **Validation** checks bounded strings and finite numbers. Your game must also check permissions, context, distance, and server-owned state.
-- **Guard** watches a decoy RemoteEvent. If a player fires it, the server can log, kick, or issue a temporary experience ban. Start with logging and make sure no legitimate code uses the decoy.
+| Part | Language | Purpose |
+| --- | --- | --- |
+| RateLimiter | Luau | Limit requests per player and action |
+| Validation | Luau | Check string lengths and finite numeric ranges |
+| Guard | Luau | Detect calls to a decoy remote; log, kick, or temporarily ban |
+| Example server | Luau | Show how the modules fit into a Roblox game |
+| Log report | JavaScript | Summarize exported detection events from the command line |
 
-## Setup in Studio
+**This does not block every cheat.** It cannot reliably identify injected software and has no built-in speed, flight, teleport, reward, or aimbot detection. Those rules depend on the game. Rate limiting blocks excess requests; it does not prove a player is cheating.
 
-1. Create a folder called `AntiCheat` in `ServerScriptService`. Add ModuleScripts called `RateLimiter`, `Validation`, and `Guard`; copy in the matching files from `src`.
-2. In `ReplicatedStorage`, create RemoteEvents named `ExampleAction` and `DecoyRemote`. Never use `DecoyRemote` in legitimate gameplay.
-3. Add a Script in `ServerScriptService` using `examples/Example.server.luau`. Run a multiplayer test and inspect Output. The example does not grant items or perform game actions.
-4. Adapt the action handler to verify server-owned permissions and game state. Make a separate limiter for each action and remove its player state when a player leaves.
+## How it fits together
 
-## Inputs and outputs
+```mermaid
+flowchart LR
+    Client[Roblox client] --> Remote[Remote request]
+    Remote --> Limit[Server rate limit]
+    Limit --> Validate[Input and game rules]
+    Validate --> Action[Allowed game action]
+    Client --> Decoy[Decoy remote]
+    Decoy --> Guard[Server detection callback]
+    Guard --> Logs[JSON event logs]
+    Logs --> Report[Offline JavaScript report]
+```
 
-`RateLimiter.new(capacity, refillPerSecond, clock?)` creates a token bucket. Capacity is the permitted burst, refill is tokens restored per second, and the optional clock supports tests. `limiter:allow(userId)` returns a boolean and consumes a token on success; `limiter:remove(userId)` clears that user's bucket.
+The server owns the decision. A legitimate game script must never call the decoy remote. Start with logging, check your integration, then choose whether kicking or temporary bans make sense for your game.
 
-`Validation.numberInRange(value, min, max)` returns true only for a finite number within the inclusive range. `Validation.shortString(value, maxBytes)` returns true for a nonempty string within the byte limit. They do not check content, permissions, or game state.
+## Start in Studio
 
-`Guard.watchHoneypot(remote, options)` returns an event connection. Options are `action` (`log`, `kick`, or `ban`), optional `onDetection(player, reason)`, and `banSeconds` (required positive whole seconds for `ban`). Logging calls the callback if supplied; use the example callback to see detections in Output. Disconnect the returned connection when no longer needed.
+1. Put the three modules from `src` in an `AntiCheat` folder under `ServerScriptService`.
+2. Create `ExampleAction` and `DecoyRemote` RemoteEvents in `ReplicatedStorage`.
+3. Copy `examples/Example.server.luau` into a server Script. It starts in logging mode and does not grant items or change game state.
+4. Add your game's server-owned permission, distance, item, and player-state checks to the action handler.
 
-Bans use Roblox's `Players:BanAsync` for this experience and explicitly exclude suspected alternate accounts. Enable the Ban API for the experience, provide an appeal route, and test in a suitable published test experience before enabling bans. A failed ban is reported in server Output. A kick only removes the player from their current server.
+The [reference](docs/REFERENCE.md) covers arguments, return values, ban configuration, cleanup, and integration checks.
 
-## Testing and limits
+## Reviewing logs
 
-Run `lune run tests/run` to check the pure modules. GitHub Actions runs these tests on pushes and pull requests. Studio multiplayer and Ban API behavior require separate testing in Roblox; automated unit tests do not prove live behavior. For a first live test, keep the action set to `log`, fire the decoy only from a test client, and confirm normal gameplay never touches it. A legitimate client firing the decoy will trigger enforcement, so do not enable bans until you have verified your integration.
+The example prints a JSON object for each honeypot detection. Save the JSON objects to a `.jsonl` file, one per line, without Studio's timestamp or script-location prefixes. This is a manual export format; the CLI does not connect to Roblox or collect logs automatically.
 
-See [Roblox's client-server security guide](https://create.roblox.com/docs/scripting/security/client-server-boundary), [detection guidance](https://create.roblox.com/docs/scripting/security/server-side-detection), and [Ban API reference](https://create.roblox.com/docs/reference/engine/classes/Players#BanAsync).
+Try the fictional sample with Node.js 22 or later:
+
+```sh
+node tools/report.mjs tools/sample-events.jsonl
+```
+
+```json
+{
+  "events": 2,
+  "ignored": 1,
+  "reasons": {
+    "honeypot_remote": 2
+  }
+}
+```
+
+Input is a path to a JSON Lines file. Detection objects have `kind: "anticheat_detection"` and a nonempty `reason` of at most 80 characters. The example also records `userId` and `timestamp`; the report only counts reasons and never prints player identifiers. Other JSON objects are counted as ignored. Invalid JSON or malformed detection records produce a line-numbered error and a nonzero exit code.
+
+Counts are observations, not ban recommendations. The report reads locally and writes JSON to standard output; it makes no network requests or enforcement decisions.
+
+## Development status
+
+The Roblox integration and Ban API have not been tested in Studio. Included unit tests cover the pure limiter and validation helpers, plus the JavaScript report. They do not verify live game behavior or the enforcement module.
+
+```sh
+lune run tests/run
+node --test tools/report.test.mjs
+```
+
+See Roblox's [server-side detection guidance](https://create.roblox.com/docs/scripting/security/server-side-detection) for the reasoning behind server-owned checks and reversible enforcement.
