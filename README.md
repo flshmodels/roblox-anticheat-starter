@@ -1,6 +1,6 @@
 # Roblox Anti-Cheat Starter
 
-Server-side checks for Roblox games, with a JavaScript tool for reviewing detection logs.
+A starting point for checking remote requests on the Roblox server. Includes a rate limiter, input checks, a decoy remote handler and a JavaScript log report.
 
 [Studio setup & API](docs/REFERENCE.md) · [MIT license](LICENSE)
 
@@ -32,7 +32,7 @@ flowchart LR
 
 The server owns the decision. A legitimate game script must never call the decoy remote. Start with logging, check your integration, then choose whether kicking or temporary bans make sense for your game.
 
-## Start in Studio
+## Getting started
 
 1. Put the three modules from `src` in an `AntiCheat` folder under `ServerScriptService`.
 2. Create `ExampleAction` and `DecoyRemote` RemoteEvents in `ReplicatedStorage`.
@@ -63,9 +63,9 @@ node tools/report.mjs tools/sample-events.jsonl
 
 Input is a path to a JSON Lines file. Detection objects have `kind: "anticheat_detection"` and a nonempty `reason` of at most 80 characters. The example also records `userId` and `timestamp`; the report only counts reasons and never prints player identifiers. Other JSON objects are counted as ignored. Invalid JSON or malformed detection records produce a line-numbered error and a nonzero exit code.
 
-Counts are observations, not ban recommendations. The report reads locally and writes JSON to standard output; it makes no network requests or enforcement decisions.
+The report counts logged events; it does not decide who to ban. It reads a local file and prints JSON without making network requests.
 
-## Development status
+## Tests and limits
 
 The Roblox integration and Ban API have not been tested in Studio. Included unit tests cover the pure limiter and validation helpers, plus the JavaScript report. They do not verify live game behavior or the enforcement module.
 
