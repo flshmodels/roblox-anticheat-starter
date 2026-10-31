@@ -1,6 +1,6 @@
 # Roblox Anti-Cheat Starter
 
-A starting point for checking remote requests on the Roblox server. Includes a rate limiter, input checks, a decoy remote handler and a JavaScript log report.
+Server-side helpers for limiting remote requests and checking inputs. There is also a decoy remote handler and a command for counting detection events in exported logs.
 
 [Studio setup & API](docs/REFERENCE.md) · [MIT license](LICENSE)
 
@@ -32,7 +32,7 @@ flowchart LR
 
 The server owns the decision. A legitimate game script must never call the decoy remote. Start with logging, check your integration, then choose whether kicking or temporary bans make sense for your game.
 
-## Getting started
+## Setup
 
 1. Put the three modules from `src` in an `AntiCheat` folder under `ServerScriptService`.
 2. Create `ExampleAction` and `DecoyRemote` RemoteEvents in `ReplicatedStorage`.
